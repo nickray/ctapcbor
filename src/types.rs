@@ -53,15 +53,15 @@ use serde_indexed::{DeserializeIndexed, SerializeIndexed};
 #[derive(Copy,Clone,Debug,Eq,PartialEq,Serialize,Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CtapOptions {
-    rk: bool,
-    up: bool,
+    pub rk: bool,
+    pub up: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    uv: Option<bool>,
-    plat: bool,
+    pub uv: Option<bool>,
+    pub plat: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    client_pin: Option<bool>,
+    pub client_pin: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    cred_protect: Option<bool>,
+    pub cred_protect: Option<bool>,
 }
 
 impl Default for CtapOptions {
@@ -104,60 +104,60 @@ pub struct PublicKeyCredentialUserEntity {
     pub display_name: Option<String<consts::U64>>,
 }
 
-//impl PublicKeyCredentialUserEntity {
-//    pub fn from(id: Bytes<consts::U64>) -> Self {
-//        Self { id, icon: None, name: None, display_name: None }
-//    }
-//}
+impl PublicKeyCredentialUserEntity {
+    pub fn from(id: Bytes<consts::U64>) -> Self {
+        Self { id, icon: None, name: None, display_name: None }
+    }
+}
 
-//#[derive(Clone,Debug,Eq,PartialEq,Serialize,Deserialize)]
-//pub struct PublicKeyCredentialParameters {
-//    pub alg: i32,
-//    #[serde(rename = "type")]
-//    pub key_type: String<consts::U10>,
-//}
+#[derive(Clone,Debug,Eq,PartialEq,Serialize,Deserialize)]
+pub struct PublicKeyCredentialParameters {
+    pub alg: i32,
+    #[serde(rename = "type")]
+    pub key_type: String<consts::U10>,
+}
 
-//#[derive(Clone,Debug,Eq,PartialEq,Serialize,Deserialize)]
-//#[serde(rename_all = "camelCase")]
-//pub struct PublicKeyCredentialDescriptor {
-//    pub id: Bytes<consts::U128>,
-//    #[serde(rename = "type")]
-//    pub key_type: String<consts::U10>,
-//    // https://w3c.github.io/webauthn/#enumdef-authenticatortransport
-//    // transports: ...
-//}
+#[derive(Clone,Debug,Eq,PartialEq,Serialize,Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PublicKeyCredentialDescriptor {
+    pub id: Bytes<consts::U128>,
+    #[serde(rename = "type")]
+    pub key_type: String<consts::U10>,
+    // https://w3c.github.io/webauthn/#enumdef-authenticatortransport
+    // transports: ...
+}
 
-//// TODO: this is a bit weird to model...
-//// Need to be able to "skip unknown keys" in deserialization
-//#[derive(Clone,Debug,Eq,PartialEq,Serialize,Deserialize)]
-//pub struct AuthenticatorExtensions {}
+// TODO: this is a bit weird to model...
+// Need to be able to "skip unknown keys" in deserialization
+#[derive(Clone,Debug,Eq,PartialEq,Serialize,Deserialize)]
+pub struct AuthenticatorExtensions {}
 
-//#[derive(Clone,Debug,Eq,PartialEq,Serialize,Deserialize)]
-//pub struct AuthenticatorOptions {
-//    #[serde(skip_serializing_if = "Option::is_none")]
-//    pub rk: Option<bool>,
-//    #[serde(skip_serializing_if = "Option::is_none")]
-//    pub up: Option<bool>,
-//    #[serde(skip_serializing_if = "Option::is_none")]
-//    pub uv: Option<bool>,
-//}
+#[derive(Clone,Debug,Eq,PartialEq,Serialize,Deserialize)]
+pub struct AuthenticatorOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rk: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub up: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uv: Option<bool>,
+}
 
-//#[derive(Clone,Debug,Eq,PartialEq,SerializeIndexed,DeserializeIndexed)]
-//// #[serde(rename_all = "camelCase")]
-//#[serde_indexed(offset = 1)]
-//pub struct GetAssertionParameters {
-//    pub rp_id: String<consts::U64>,
-//    pub client_data_hash: Bytes<consts::U32>,
-//    pub allow_list: Vec<PublicKeyCredentialDescriptor, consts::U8>,
-//    #[serde(skip_serializing_if = "Option::is_none")]
-//    pub extensions: Option<AuthenticatorExtensions>,
-//    #[serde(skip_serializing_if = "Option::is_none")]
-//    pub options: Option<AuthenticatorOptions>,
-//    #[serde(skip_serializing_if = "Option::is_none")]
-//    pub pin_auth: Option<Bytes<consts::U16>>,
-//    #[serde(skip_serializing_if = "Option::is_none")]
-//    pub pin_protocol: Option<u32>,
-//}
+#[derive(Clone,Debug,Eq,PartialEq,SerializeIndexed,DeserializeIndexed)]
+// #[serde(rename_all = "camelCase")]
+#[serde_indexed(offset = 1)]
+pub struct GetAssertionParameters {
+    pub rp_id: String<consts::U64>,
+    pub client_data_hash: Bytes<consts::U32>,
+    pub allow_list: Vec<PublicKeyCredentialDescriptor, consts::U8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<AuthenticatorExtensions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub options: Option<AuthenticatorOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pin_auth: Option<Bytes<consts::U16>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pin_protocol: Option<u32>,
+}
 
 //#[derive(Clone,Debug,Eq,PartialEq,SerializeIndexed,DeserializeIndexed)]
 //// #[serde(rename_all = "camelCase")]

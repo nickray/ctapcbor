@@ -9,7 +9,6 @@ use serde::de::{
     DeserializeSeed,
     IntoDeserializer,
     Visitor,
-    // EnumAccess, MapAccess, VariantAccess
 };
 
 use crate::error::{Error, Result};
@@ -48,6 +47,23 @@ impl<'de> Deserializer<'de> {
         }
     }
 
+    fn peek(&mut self) -> Result<u8> {
+        if self.input.len() != 0 {
+            Ok(self.input[0])
+        } else {
+            Err(Error::DeserializeUnexpectedEnd)
+        }
+    }
+
+    fn consume(&mut self) -> Result<()> {
+        if self.input.len() != 0 {
+            self.input = &self.input[1..];
+            Ok(())
+        } else {
+            Err(Error::DeserializeUnexpectedEnd)
+        }
+    }
+
     fn expect_major(&mut self, major: u8) -> Result<u8> {
         let byte = self.try_take_n(1)?[0];
         if major != (byte >> 5) {
@@ -75,27 +91,11 @@ impl<'de> Deserializer<'de> {
 
     fn raw_deserialize_u16(&mut self, major: u8) -> Result<u16>
     {
-        let additional = self.expect_major(major)?;
-
-        match additional {
-            byte @ 0..=23 => Ok(byte as u16),
-            24 => {
-                match self.try_take_n(1)?[0] {
-                    0..=23 => Err(Error::DeserializeNonMinimal),
-                    byte => Ok(byte as u16),
-                }
-            },
-            25 => {
-                let unsigned = u16::from_be_bytes(
-                    self.try_take_n(2)?
-                    .try_into().map_err(|_| Error::InexistentSliceToArrayError)?
-                );
-                match unsigned {
-                    0..=255 => Err(Error::DeserializeNonMinimal),
-                    unsigned => Ok(unsigned),
-                }
-            },
-            _ => Err(Error::DeserializeBadU16),
+        let number = self.raw_deserialize_u32(major)?;
+        if number <= u16::max_value() as u32 {
+            Ok(number as u16)
+        } else {
+            Err(Error::DeserializeBadU16)
         }
     }
 
@@ -154,30 +154,62 @@ impl<'de> Deserializer<'de> {
     // }
 }
 
-// struct SeqAccess<'a, 'b: 'a> {
-//     deserializer: &'a mut Deserializer<'b>,
-//     len: usize,
-// }
+struct SeqAccess<'a, 'b: 'a> {
+    deserializer: &'a mut Deserializer<'b>,
+    len: usize,
+}
 
-// impl<'a, 'b: 'a> serde::de::SeqAccess<'b> for SeqAccess<'a, 'b> {
-//     type Error = Error;
+impl<'a, 'b: 'a> serde::de::SeqAccess<'b> for SeqAccess<'a, 'b> {
+    type Error = Error;
 
-//     fn next_element_seed<V: DeserializeSeed<'b>>(&mut self, seed: V) -> Result<Option<V::Value>> {
-//         if self.len > 0 {
-//             self.len -= 1;
-//             Ok(Some(DeserializeSeed::deserialize(
-//                 seed,
-//                 &mut *self.deserializer,
-//             )?))
-//         } else {
-//             Ok(None)
-//         }
-//     }
+    fn next_element_seed<V>(&mut self, seed: V) -> Result<Option<V::Value>>
+    where
+        V: DeserializeSeed<'b>
+    {
+        if self.len > 0 {
+            self.len -= 1;
+            Ok(Some(seed.deserialize(&mut *self.deserializer)?))
+        } else {
+            Ok(None)
+        }
+    }
 
-//     fn size_hint(&self) -> Option<usize> {
-//         Some(self.len)
-//     }
-// }
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.len)
+    }
+}
+
+struct MapAccess<'a, 'b: 'a> {
+    deserializer: &'a mut Deserializer<'b>,
+    len: usize,
+}
+
+impl<'a, 'b: 'a> serde::de::MapAccess<'b> for MapAccess<'a, 'b> {
+    type Error = Error;
+
+    fn next_key_seed<V>(&mut self, seed: V) -> Result<Option<V::Value>>
+    where
+        V: DeserializeSeed<'b>
+    {
+        if self.len > 0 {
+            self.len -= 1;
+            Ok(Some(seed.deserialize(&mut *self.deserializer)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value>
+    where
+        V: de::DeserializeSeed<'b>,
+    {
+        seed.deserialize(&mut *self.deserializer)
+    }
+
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.len)
+    }
+}
 
 impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     type Error = Error;
@@ -379,32 +411,33 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value>
     where
-        V: Visitor<'de>,
+        V: de::Visitor<'de>,
     {
-        todo!();
-        // match self.try_take_n(1)?[0] {
-        //     0 => visitor.visit_none(),
-        //     1 => visitor.visit_some(self),
-        //     _ => Err(Error::DeserializeBadOption),
-        // }
+        match self.peek()? {
+            0xf6 => {
+                self.consume()?;
+                visitor.visit_none()
+            }
+            _ => visitor.visit_some(self),
+        }
     }
 
     // In Serde, unit means an anonymous value containing no data.
-    // Unit is not actually encoded in ctapcbor.
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
+        // Not sure if this is simple value null (22) or undefined (23) or what
         todo!();
         // visitor.visit_unit()
     }
 
     // Unit struct means a named value containing no data.
-    // Unit structs are not actually encoded in ctapcbor.
     fn deserialize_unit_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
+        // Not sure if this is simple value null (22) or undefined (23) or what
         todo!();
         // self.deserialize_unit(visitor)
     }
@@ -413,6 +446,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        // can we follow postcard's approach here?
         todo!();
         // visitor.visit_newtype_struct(self)
     }
@@ -421,24 +455,23 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        todo!();
-        // let len = self.try_take_varint()?;
+        // major type 4: "array"
+        let len = self.raw_deserialize_u32(4)? as usize;
 
-        // visitor.visit_seq(SeqAccess {
-        //     deserializer: self,
-        //     len,
-        // })
+        visitor.visit_seq(SeqAccess {
+            deserializer: self,
+            len,
+        })
     }
 
     fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        todo!();
-        // visitor.visit_seq(SeqAccess {
-        //     deserializer: self,
-        //     len,
-        // })
+        visitor.visit_seq(SeqAccess {
+            deserializer: self,
+            len,
+        })
     }
 
     fn deserialize_tuple_struct<V>(
@@ -453,13 +486,17 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.deserialize_tuple(len, visitor)
     }
 
-    fn deserialize_map<V>(self, _visitor: V) -> Result<V::Value>
+    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        // I plan to implement this, but haven't yet. Open an issue if you'd
-        // like it done sooner :)
-        Err(Error::NotYetImplemented)
+        // major type 5: "map"
+        let len = self.raw_deserialize_u32(5)? as usize;
+
+        visitor.visit_map(MapAccess {
+            deserializer: self,
+            len,
+        })
     }
 
     fn deserialize_struct<V>(
@@ -471,8 +508,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        todo!();
-        // self.deserialize_tuple(fields.len(), visitor)
+        self.deserialize_map(visitor)
     }
 
     fn deserialize_enum<V>(
@@ -488,19 +524,18 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         // visitor.visit_enum(self)
     }
 
-    // As a binary format, ctapcbor does not encode identifiers
-    fn deserialize_identifier<V>(self, _visitor: V) -> Result<V::Value>
+    fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        // Will not support
-        Err(Error::WontImplement)
+        self.deserialize_str(visitor)
     }
 
     fn deserialize_ignored_any<V>(self, _visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
+        // TODO: ORLY?
         // Will not support
         Err(Error::WontImplement)
     }
@@ -737,6 +772,35 @@ mod tests {
         let n = cbor_serialize(&string, &mut buf);
         let de: heapless::String<U64> = from_bytes(&buf).unwrap();
         assert_eq!(de, string_slice);
+    }
+
+    #[test]
+    fn de_struct() {
+        use crate::types::CtapOptions;
+        // rk: bool,
+        // up: bool,
+        // #[serde(skip_serializing_if = "Option::is_none")]
+        // uv: Option<bool>,
+        // plat: bool,
+        // #[serde(skip_serializing_if = "Option::is_none")]
+        // client_pin: Option<bool>,
+        // #[serde(skip_serializing_if = "Option::is_none")]
+        // cred_protect: Option<bool>,
+
+        let options = CtapOptions {
+            rk: false,
+            up: true,
+            uv: None,
+            plat: false,
+            client_pin: Some(true),
+            cred_protect: Some(false),
+        };
+
+        let mut buf = [0u8; 64];
+
+        let n = cbor_serialize(&options, &mut buf);
+        let de: CtapOptions = from_bytes(&buf).unwrap();
+        assert_eq!(de, options);
     }
 
 }

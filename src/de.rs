@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 pub(crate) mod deserializer;
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use deserializer::Deserializer;
 
 /// Deserialize a message of type `T` from a byte slice. The unused portion (if any)
