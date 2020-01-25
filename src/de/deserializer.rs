@@ -260,6 +260,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         match self.peek_major()? {
+            // TODO: figure out if this is BAAAAD for size or speed
             major @ 0..=1 => {
                 let raw = self.raw_deserialize_u32(major)?;
                 if raw <= i32::max_value() as u32 {
@@ -332,6 +333,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        // not sure, can this be implemented?
         todo!();
         // let mut buf = [0u8; 4];
         // let bytes = self.try_take_n(4)?;
@@ -340,44 +342,39 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         // visitor.visit_char(core::char::from_u32(integer).ok_or(Error::DeserializeBadChar)?)
     }
 
-    fn deserialize_str<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        todo!();
-        // let sz = self.try_take_varint()?;
-        // let bytes: &'de [u8] = self.try_take_n(sz)?;
-        // let str_sl = core::str::from_utf8(bytes).map_err(|_| Error::DeserializeBadUtf8)?;
-
-        // visitor.visit_borrowed_str(str_sl)
-    }
-
-    fn deserialize_string<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        todo!();
-        // self.deserialize_str(visitor)
-    }
-
     fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        todo!();
-        // // AJM - in serialize_bytes, we don't write the length first
-        // // is this asymmetry intended?
-        // let sz = self.try_take_varint()?;
-        // let bytes: &'de [u8] = self.try_take_n(sz)?;
-        // visitor.visit_borrowed_bytes(bytes)
+        // major type 2: "byte string"
+        let length = self.raw_deserialize_u32(2)? as usize;
+        let bytes: &'de [u8] = self.try_take_n(length)?;
+        visitor.visit_borrowed_bytes(bytes)
     }
 
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        todo!();
-        // self.deserialize_bytes(visitor)
+        self.deserialize_bytes(visitor)
+    }
+
+    fn deserialize_str<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        // major type 3: "text string"
+        let length = self.raw_deserialize_u32(3)? as usize;
+        let bytes: &'de [u8] = self.try_take_n(length)?;
+        let string_slice = core::str::from_utf8(bytes).map_err(|_| Error::DeserializeBadUtf8)?;
+        visitor.visit_borrowed_str(string_slice)
+    }
+
+    fn deserialize_string<V>(self, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        self.deserialize_str(visitor)
     }
 
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value>
@@ -711,6 +708,35 @@ mod tests {
             let de: i32 = from_bytes(&buf).unwrap();
             assert_eq!(de, number);
         }
+    }
+
+    #[test]
+    fn de_bytes() {
+        use heapless::consts::U64;
+
+        let mut buf = [0u8; 64];
+
+        let slice = b"thank you postcard!";
+        let bytes = heapless_bytes::Bytes::<U64>::try_from_slice(slice).unwrap();
+        let n = cbor_serialize(&bytes, &mut buf).unwrap();
+        println!("serialized bytes = {:?}", &buf[..n]);
+        let de: heapless_bytes::Bytes::<U64> = from_bytes(&buf).unwrap();
+        println!("deserialized bytes = {:?}", &de);
+        assert_eq!(&de, slice);
+    }
+
+    #[test]
+    fn de_str() {
+        use heapless::consts::U64;
+
+        let mut buf = [0u8; 64];
+
+        let string_slice = "thank you postcard, for blazing the path 🐝";
+        let mut string = heapless::String::<U64>::new();
+        string.push_str(string_slice).unwrap();
+        let n = cbor_serialize(&string, &mut buf);
+        let de: heapless::String<U64> = from_bytes(&buf).unwrap();
+        assert_eq!(de, string_slice);
     }
 
 }

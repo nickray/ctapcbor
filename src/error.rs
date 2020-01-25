@@ -24,8 +24,8 @@ pub enum Error {
     DeserializeBadBool,
     // /// Found an invalid unicode char
     // DeserializeBadChar,
-    // /// Tried to parse invalid utf-8
-    // DeserializeBadUtf8,
+    /// Tried to parse invalid utf-8
+    DeserializeBadUtf8,
     // /// Found an Option discriminant that wasn't 0 or 1
     // DeserializeBadOption,
     // /// Found an enum discriminant that was > u32::max_value()
@@ -75,7 +75,7 @@ impl Display for Error {
                 // }
                 DeserializeBadBool => "Found a bool that wasn't 0xf4 or 0xf5",
                 // DeserializeBadChar => "Found an invalid unicode char",
-                // DeserializeBadUtf8 => "Tried to parse invalid utf-8",
+                DeserializeBadUtf8 => "Tried to parse invalid utf-8",
                 // DeserializeBadOption => "Found an Option discriminant that wasn't 0 or 1",
                 // DeserializeBadEnum => "Found an enum discriminant that was > u32::max_value()",
                 // DeserializeBadEncoding => "The original data was not well encoded",

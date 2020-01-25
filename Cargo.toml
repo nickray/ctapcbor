@@ -16,3 +16,6 @@ serde-indexed = { git = "https://github.com/ycrypto/serde-indexed", branch = "ma
 
 [features]
 use-std = []
+
+# [patch."https://github.com/ycrypto/heapless-bytes"]
+# heapless-bytes = { path = "../heapless-bytes" }
