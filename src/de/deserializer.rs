@@ -344,7 +344,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        Err(Error::NotYetImplemented)
+        let raw = self.raw_deserialize_u32(0)?;
+        visitor.visit_u64(raw as u64)
     }
 
     fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value>
