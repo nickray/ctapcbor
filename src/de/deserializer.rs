@@ -804,4 +804,20 @@ mod tests {
         assert_eq!(de, options);
     }
 
+    #[test]
+    fn de_credential_id() {
+        use heapless_bytes::{Bytes, consts::{U32, U64}};
+        use serde_indexed::{DeserializeIndexed, SerializeIndexed};
+        #[derive(Clone,Debug,Eq,PartialEq,SerializeIndexed,DeserializeIndexed)]
+        pub struct CredentialInner {
+            pub user_id: Bytes<U64>,
+            pub alg: i8,
+            pub seed: Bytes<U32>,
+        }
+
+        let input = b"\xa3\x00Gnickray\x01&\x02X @7\xbf\xa6\x98j\xb9\x0e8nB\x92\xd8\xf2\x1bK\xef\x92\xe87\xfe2`\x92%\xff\x98jR\xd1\xc8\xc1";
+
+        let credential_inner: CredentialInner = from_bytes(input).unwrap();
+    }
+
 }
